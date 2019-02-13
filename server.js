@@ -57,7 +57,7 @@ db.serialize(function(){
     //        );`);
     // db.run("DROP TABLE IF EXISTS assignments");
 
-    //db.run("UPDATE assignments set email=  'gretchen.m.wright@gmail.com' WHERE dates = date('now')");
+    // db.run("UPDATE assignments set email=  'gretchen.m.wright@gmail.com' WHERE dates = date('now')");
     // db.run("DELETE FROM assignments  WHERE email = 'gretchen.m.wright@gmail.com'");
     // db.run("INSERT OR REPLACE INTO assignments(dates, email) VALUES (date('now'), 'gretchen.m.wright@gmail.com')");
     // db.run("INSERT OR REPLACE INTO assignments(dates) VALUES (date('now', '+1 day'))");
@@ -145,26 +145,25 @@ app.post('/webhook/zulip', function(request, response) {
   response.status(200).json({ status: "ok" });
 });
 
-//TODO:ADD PROMISE TO insertDates
-function insertDates(start,end) {
-  var generateDatesArray = function(startOne, endOne) {
-    let plpDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday']
+const PLP_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday"];
 
-    let
-      arr = new Array(),
-      dt = new Date(startOne);
+const generateDatesArray = (startDate, endDate) => {
+  const dates = [];
+  let currentDate = new Date(startDate);
 
-    while (dt <= endOne) {
-      let weekDay = dt.toLocaleDateString('en-EN', {'weekday': 'long'})
-      if(plpDays.includes(weekDay)) {
-        arr.push(new Date(dt));
-      }
-      dt.setDate(dt.getDate() + 1);
+  while (currentDate <= endDate) {
+    const weekDay = currentDate.toLocaleDateString('en-US', {'weekday': 'long', 'timeZone': 'America/New_York'});
+    if (PLP_DAYS.includes(weekDay)) {
+      dates.push(new Date(currentDate));
     }
-
-    return arr;
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
+  return dates;
+}
+
+//TODO:ADD PROMISE TO insertDates
+function insertDates(start,end) {
   let startDate = new Date(start)
   let endDate = new Date(end)
 
@@ -174,8 +173,8 @@ function insertDates(start,end) {
   let cmdArray = [];
   dates.forEach(
     (date) => {
-      let day = date.toLocaleDateString('en-EN', {'day': '2-digit'})
-      let month = date.toLocaleDateString('en-EN', {'month': '2-digit'})
+      let day = date.toLocaleDateString('en-US', {'day': '2-digit'})
+      let month = date.toLocaleDateString('en-US', {'month': '2-digit'})
       let year = date.getYear() + 1900
       let cmd = "INSERT OR REPLACE INTO assignments(dates) VALUES (date('" + year + "-" + month + "-" + day + "'))";
       cmdArray.push(cmd)
@@ -363,8 +362,8 @@ const handlePrivateMessageToBot = async (body) => {
   const startBatchMatch = message.match(/^start\sbatch\s(\d+-\d+-\d+)\s(\d+-\d+-\d+)$/);
 
   if (startBatchMatch) {
-    const startDate = startBatchMatch[1];
-    const endDate = startBatchMatch[2];
+    const startDate = `${startBatchMatch[1]} GMT-05:00`;
+    const endDate = `${startBatchMatch[2]} GMT-05:00`;
     
     insertDates(startDate, endDate) 
   
