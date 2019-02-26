@@ -45,36 +45,14 @@ db.serialize(function(){
       db.run("CREATE INDEX email_index ON assignments (email)");
       
     });
-      
-
   }
-  else {
-    // db.run(`CREATE TABLE assignments (
-    //           dateNum INTEGER PRIMARY KEY AUTOINCREMENT,
-    //           dates TEXT NOT NULL,
-    //           user TEXT,
-    //           email TEXT  
-    //        );`);
-    // db.run("DROP TABLE IF EXISTS assignments");
-
-    // db.run("UPDATE assignments set email=  'gretchen.m.wright@gmail.com' WHERE dates = date('now')");
-    // db.run("DELETE FROM assignments  WHERE email = 'gretchen.m.wright@gmail.com'");
-    // db.run("INSERT OR REPLACE INTO assignments(dates, email) VALUES (date('now'), 'gretchen.m.wright@gmail.com')");
-    // db.run("INSERT OR REPLACE INTO assignments(dates) VALUES (date('now', '+1 day'))");
-    
-    // db.run("INSERT OR REPLACE INTO assignments(dates) VALUES (date('2019-01-09'))");
-    // db.run("INSERT OR REPLACE INTO assignments(dates=) VALUES (date('now','weekday 2'))");
-    // db.run("UPDATE assignments SET email=? WHERE dateNum=?;", null, parseInt(12));
-    
+  else {    
     console.log('Database ready to go!');
     db.each('SELECT * from assignments', function(err, row) {
       if ( row ) {
         console.log('record:', row.dates + ' | ' + row.email + ' | ' + row.dateNum);
       }
-    });
-
-
-    
+    });    
   }
 }); 
 
@@ -90,16 +68,6 @@ app.get('/calendar', function(request, response) {
 app.post('/add/dates', function(request, response) {
   // save to db
 });
-
-// endpoint to get all the dreams in the database
-// currently this is the only endpoint, ie. adding dreams won't update the database
-// read the sqlite3 module docs and try to add your own! https://www.npmjs.com/package/sqlite3
-
-// app.get('/getDreams', function(request, response) {
-//   db.all('SELECT * from Dreams', function(err, rows) {
-//     response.send(JSON.stringify(rows));
-//   });
-// });
 
 app.post("/cron/run", function(request, response) {
   console.log("Running the reminder");
@@ -225,33 +193,31 @@ const handlePrivateMessageToBot = async (body) => {
   }
 
   if (message=="get free dates") {
-    var result = "";
-    db.all('SELECT dateNum, dates from assignments WHERE email is NULL', function(err, rows) {
-      if ( rows ) {
-        
-        for (let i in rows) {
-          console.log(rows[i]);
-          result = result + "\n" +
-            rows[i].dateNum + " : " + rows[i].dates;        
-        }
+    let result;
+    db.all('SELECT dateNum, dates from assignments WHERE email is NULL AND date(dates) > date("now")', function(err, rows) {
+
+      if (err) {
+        result =  "Sorry, there was a database error.";
+      } else if (!rows.length) {
+        result = "No free dates found.";
+      } else {
+        const dates = rows.map(row => `${row.dateNum} : ${row.dates}`).join("\n");
+        result = `Here are the unassigned dates: \n${dates}`;
       }
-      result = 'Here are the unassigned dates: ' + result;
-      // TODO: can send markdown formatted messages
-      // result = `|| yes | no | ` + result +
-      //          `|---|---|:---:|------:
-      //           | A | left-aligned | centered | right-aligned`;
+      
       zulipAPI.messages.send({
         to: fromEmail,
         type: "private",
         content: result
       });
     });
+    
     return;
   } 
   
   if (message=='get schedule') {
     var result = "";
-    db.all('SELECT * FROM assignments', function(err, rows) {
+    db.all('SELECT * FROM assignments WHERE date(dates) >= date("now")', function(err, rows) {
       if (rows) {
         for (let i in rows){
           result = result + '\n' + rows[i].dateNum + " : " + rows[i].dates + " : " + rows[i].email;
@@ -268,23 +234,17 @@ const handlePrivateMessageToBot = async (body) => {
   }
   
   if (message=="get my dates") {
-      var result = "";
-      var cmd = "SELECT dateNum, dates from assignments WHERE email=='" + fromEmail + "'";
-      console.log(cmd)
-      db.all(cmd, function(err, rows) {
-        if ( rows ) {
-
-          for (let i in rows) {
-            console.log(rows[i]);
-            result = result + "\n" +
-              rows[i].dateNum + " : " + rows[i].dates;        
-          }
+      let result;
+      var cmd = 'SELECT dateNum, dates from assignments WHERE email=="' + fromEmail + '" AND date(dates) >= date("now")';
+      db.all(cmd, (err, rows) => {
+        if (err) {
+          result = "Sorry, there was a database error :(.";
+        } else if (!rows.length) {
+          result = "You have no PLP dates assigned to you.";
+        } else {
+          const dates = rows.map(row => `${row.dateNum}: ${row.dates}`).join('\n');
+          result = `Here are your assigned dates: \n${dates}`;
         }
-        result = 'Here are your assigned dates: ' + result;
-        // TODO: can send markdown formatted messages
-        // result = `|| yes | no | ` + result +
-        //          `|---|---|:---:|------:
-        //           | A | left-aligned | centered | right-aligned`;
         zulipAPI.messages.send({
           to: fromEmail,
           type: "private",
@@ -385,53 +345,6 @@ const handlePrivateMessageToBot = async (body) => {
           content: "I could not find a valid command. Please try again."  + "\n" + cmdList
         });
   
-// NOT USED YET
-//   const creationMatch = message.match(/^create calendar (.*)$/);
-//   if (creationMatch){
-//     const dateMatch = creationMatch[1].match(/^(\d\d\d\d)-(\d\d)-(\d\d)$/);
-//     if (dateMatch){
-//       //generate all valid dates from now to _date_ 
-//       //for each date only insert into 'assignments' if the corresponding date does not already exist
-//       var endDate = new Date();
-//       endDate.setFullYear(dateMatch[1]);
-//       endDate.setMonth(parseInt(dateMatch[2]) - 1);
-//       endDate.setDate(dateMatch[3]);
-//       //get list of dates that already exist
-      
-//       // TODO: only grab those that are between today and endDate
-//       db.all('SELECT dates FROM assignments', function(err, rows){
-//         const existing_dates = rows.map(v => v.dates);
-//         console.log("existing_dates: ", existing_dates);
-//         var dates_to_add = [];
-//         //add each date between now and 'date'
-//         var curDate = new Date();
-//         while (curDate <= endDate){
-//             console.log(curDate);
-//           // need to check doesn't already exist
-//             if (!existing_dates.includes(curDate) ){
-//               dates_to_add.push(curDate)
-//             }
-//           // TODO: generate date in sqlite:
-// //             INSERT INTO memos(id,text) 
-// // SELECT 5, 'text to insert' 
-// // WHERE NOT EXISTS(SELECT 1 FROM memos WHERE id = 5 AND text = 'text to insert');
-  
-//           curDate.setDate(curDate.getDate + 1); //TODO: exclude all but Mon thru Thur
-//         }
-//         console.log(dates_to_add);
-//         for (let i in dates_to_add) {
-//             db.run("INSERT INTO assignments(dates) VALUES (?)", dates_to_add[i]);
-//         }
-//       });
-//     }
-//     else{
-//       zulipAPI.messages.send({
-//         to: fromEmail,
-//         type: "private",
-//         content: "The end date seems to be in a wrong format. Correct format is yyyy-mm-dd. Please, try again! " 
-//       });
-//     }
-//   }
 }
 // listen for requests :)
 var listener = app.listen(process.env.PORT, function() {
