@@ -101,10 +101,10 @@ const handlePrivateMessageToBot = async (body) => {
     const message = body.data;
     const fromEmail = body.message.sender_email;
 
-    const sendPrivateZulipMessage = message => zulipAPI.messages.send({
+    const sendPrivateZulipMessage = content => zulipAPI.messages.send({
         to: fromEmail,
         type: "private",
-        content: message,
+        content: content,
     });
   
     const checkAdmin = fn => {
